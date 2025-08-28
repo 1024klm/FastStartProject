@@ -1,6 +1,6 @@
 export const pythonStack = {
   files: {
-    'main.py': `#!/usr/bin/env python3
+    'src/main.py': `#!/usr/bin/env python3
 """
 PROJECT_NAME - A new Python project
 """

@@ -26,15 +26,16 @@ export async function initGitRepo(projectPath) {
  * @param {string} projectName - Name of the project
  * @param {string} visibility - 'public' or 'private'
  * @param {string} projectPath - Path to the project
+ * @param {Object} options - Additional options
  * @returns {Promise<boolean>} - Success status
  */
-export async function createGitHubRepo(projectName, visibility, projectPath) {
+export async function createGitHubRepo(projectName, visibility = 'private', projectPath, options = {}) {
   const spinner = ora('Creating GitHub repository...').start();
   
   try {
     const git = simpleGit(projectPath);
     
-    // Check if gh CLI is installed (use system command)
+    // Check if gh CLI is installed
     try {
       execSync('gh --version', { stdio: 'ignore' });
     } catch {
@@ -52,15 +53,92 @@ export async function createGitHubRepo(projectName, visibility, projectPath) {
       return false;
     }
     
-    spinner.succeed(chalk.green('GitHub CLI detected. Repo creation command ready.'));
+    // Check if authenticated
+    try {
+      execSync('gh auth status', { stdio: 'ignore' });
+    } catch {
+      spinner.fail(chalk.yellow('Not authenticated with GitHub'));
+      console.log(chalk.cyan('\n📝 To authenticate:'));
+      console.log(chalk.white('  gh auth login'));
+      return false;
+    }
     
-    console.log(chalk.cyan('\n📝 To create the GitHub repository:'));
-    console.log(chalk.white(`  cd ${projectName}`));
-    console.log(chalk.white(`  gh repo create ${projectName} --${visibility} --source=. --remote=origin --push`));
+    spinner.text = 'Creating GitHub repository...';
     
-    return true;
+    // Build gh repo create command
+    const args = [
+      'repo', 'create', projectName,
+      `--${visibility}`,
+      '--source=.',
+      '--remote=origin'
+    ];
+    
+    // Add optional parameters
+    if (options.description) {
+      args.push('--description', `"${options.description}"`);
+    }
+    
+    if (options.topics && options.topics.length > 0) {
+      // Add topics after creation
+    }
+    
+    if (options.push !== false) {
+      args.push('--push');
+    }
+    
+    // Create the repository
+    try {
+      const command = `gh ${args.join(' ')}`;
+      execSync(command, { cwd: projectPath, stdio: 'pipe' });
+      spinner.succeed(chalk.green('GitHub repository created successfully!'));
+      
+      // Add topics if provided
+      if (options.topics && options.topics.length > 0) {
+        const topicsCommand = `gh repo edit ${projectName} --add-topic "${options.topics.join(',')}"`;
+        execSync(topicsCommand, { cwd: projectPath, stdio: 'pipe' });
+        console.log(chalk.green('✓ Topics added: ') + chalk.gray(options.topics.join(', ')));
+      }
+      
+      // Enable features if requested
+      if (options.enableIssues) {
+        execSync(`gh repo edit ${projectName} --enable-issues`, { cwd: projectPath, stdio: 'pipe' });
+      }
+      
+      if (options.enableWiki) {
+        execSync(`gh repo edit ${projectName} --enable-wiki`, { cwd: projectPath, stdio: 'pipe' });
+      }
+      
+      // Set up branch protection if requested
+      if (options.protectMain) {
+        try {
+          execSync(`gh api repos/:owner/${projectName}/branches/main/protection -X PUT -f required_status_checks='{"strict":true,"contexts":["continuous-integration"]}' -f enforce_admins=false -f required_pull_request_reviews='{"required_approving_review_count":1}'`, 
+            { cwd: projectPath, stdio: 'pipe' });
+          console.log(chalk.green('✓ Branch protection enabled for main'));
+        } catch {
+          // Branch protection might require higher permissions
+        }
+      }
+      
+      // Get the repo URL
+      const repoUrl = execSync('gh repo view --json url -q .url', { cwd: projectPath, encoding: 'utf8' }).trim();
+      console.log(chalk.cyan('\n🎉 Repository created: ') + chalk.blue.underline(repoUrl));
+      
+      return true;
+    } catch (error) {
+      if (error.message.includes('already exists')) {
+        spinner.fail(chalk.yellow('Repository already exists'));
+        console.log(chalk.cyan('\n📝 To use the existing repo:'));
+        console.log(chalk.white(`  cd ${projectName}`));
+        console.log(chalk.white(`  git remote add origin git@github.com:USERNAME/${projectName}.git`));
+        console.log(chalk.white(`  git push -u origin main`));
+      } else {
+        spinner.fail(chalk.red('Failed to create GitHub repository'));
+        console.error(error.message);
+      }
+      return false;
+    }
   } catch (error) {
-    spinner.fail(chalk.red('Error preparing GitHub repository'));
+    spinner.fail(chalk.red('Error creating GitHub repository'));
     console.error(error.message);
     return false;
   }

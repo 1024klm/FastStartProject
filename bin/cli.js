@@ -313,6 +313,10 @@ async function createProject(projectName, options) {
     let stackConfig = getStackConfig(finalStack);
     stackConfig = applyProfileToStack(stackConfig, finalProfile);
     
+    // Enhance stack with standardized scripts
+    const { enhanceStackConfig } = await import('../src/stacks/enhanced.js');
+    stackConfig = enhanceStackConfig(stackConfig, finalStack, packageManager, finalProfile);
+    
     // Add formatter configs for JS/TS stacks
     if (['javascript', 'typescript', 'react', 'next'].includes(finalStack) && profileConfig.includeFormatting) {
       stackConfig.files['.prettierrc'] = JSON.stringify(getPrettierConfig(finalStack), null, 2);
@@ -396,7 +400,12 @@ async function createProject(projectName, options) {
 
       // GitHub repo (ne pas déclencher auto en mode non-interactif)
       if (!nonInteractive && answers.github) {
-        await createGitHubRepo(finalProjectName, answers.visibility, projectPath);
+        await createGitHubRepo(finalProjectName, answers.visibility, projectPath, {
+          description: finalDescription,
+          topics: [finalStack, 'ai-optimized', 'faststart'],
+          enableIssues: true,
+          protectMain: finalProfile === 'full'
+        });
       }
     }
 

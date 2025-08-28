@@ -9,8 +9,10 @@
   "type": "module",
   "main": "bin/cli.js",
   "scripts": {
-    "test": "node bin/cli.js test-project --javascript --no-github --no-git --yes --force",
-    "start": "node bin/cli.js start"
+    "test": "node test/smoke.test.js",
+    "test:quick": "node bin/cli.js test-project --javascript --no-github --no-git --yes --force --profile minimal",
+    "start": "node bin/cli.js start",
+    "dev": "node bin/cli.js"
   },
   "dependencies": {
     "commander": "^11.0.0",

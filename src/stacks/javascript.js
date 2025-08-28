@@ -17,6 +17,9 @@ export const javascriptStack = {
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
   }
 }`,
     'src/index.js': `// 🚀 PROJECT_NAME - Ready to ship!

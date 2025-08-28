@@ -1,4 +1,5 @@
 import { simpleGit } from 'simple-git';
+import { execSync } from 'child_process';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -33,9 +34,9 @@ export async function createGitHubRepo(projectName, visibility, projectPath) {
   try {
     const git = simpleGit(projectPath);
     
-    // Check if gh CLI is installed
+    // Check if gh CLI is installed (use system command)
     try {
-      await git.raw(['--version']);
+      execSync('gh --version', { stdio: 'ignore' });
     } catch {
       spinner.fail(chalk.yellow('GitHub CLI (gh) not installed'));
       console.log(chalk.cyan('\n📝 To install GitHub CLI:'));
@@ -51,7 +52,7 @@ export async function createGitHubRepo(projectName, visibility, projectPath) {
       return false;
     }
     
-    spinner.succeed(chalk.green('GitHub repo instructions ready'));
+    spinner.succeed(chalk.green('GitHub CLI detected. Repo creation command ready.'));
     
     console.log(chalk.cyan('\n📝 To create the GitHub repository:'));
     console.log(chalk.white(`  cd ${projectName}`));

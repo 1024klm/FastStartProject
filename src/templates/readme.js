@@ -78,7 +78,7 @@ MIT
 
 ---
 
-*Généré avec [ai-project-init](https://github.com/yourusername/ai-project-init) - Lightning fast AI-optimized project generator*
+*Généré avec [FastStartProject](https://github.com/yourusername/faststartproject) - Lightning fast AI-optimized project generator*
 `;
 }
 

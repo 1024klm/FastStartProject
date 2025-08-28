@@ -1,16 +1,16 @@
 {
-  "name": "ai-project-init",
+  "name": "faststartproject",
   "version": "1.0.0",
   "description": "Lightning fast project generator optimized for AI coding assistants",
   "bin": {
-    "ai-init": "./bin/cli.js",
+    "faststart": "./bin/cli.js",
     "newproject": "./bin/cli.js"
   },
   "type": "module",
-  "main": "src/index.js",
+  "main": "bin/cli.js",
   "scripts": {
-    "test": "node bin/cli.js test-project -js",
-    "start": "node bin/cli.js"
+    "test": "node bin/cli.js test-project --javascript --no-github --no-git --yes --force",
+    "start": "node bin/cli.js start"
   },
   "dependencies": {
     "commander": "^11.0.0",
@@ -39,9 +39,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/ai-project-init.git"
+    "url": "https://github.com/yourusername/faststartproject.git"
   },
-  "homepage": "https://github.com/yourusername/ai-project-init#readme",
+  "homepage": "https://github.com/yourusername/faststartproject#readme",
   "files": [
     "bin/",
     "src/"

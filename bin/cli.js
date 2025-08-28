@@ -10,8 +10,14 @@ import { simpleGit } from 'simple-git';
 import { fileURLToPath } from 'url';
 import { generateRules } from '../src/templates/rules.js';
 import { generateReadme } from '../src/templates/readme.js';
+import { generateEditorconfig } from '../src/templates/editorconfig.js';
+import { generatePreCommitConfig } from '../src/templates/precommit.js';
+import { generateGitHubActions } from '../src/templates/github-actions.js';
+import { generateDockerfiles } from '../src/templates/docker.js';
 import { getStackConfig } from '../src/stacks/index.js';
 import { createGitHubRepo } from '../src/utils/github.js';
+import { detectPackageManager, getPackageManagerCommands } from '../src/utils/package-manager.js';
+import { replaceTemplateVariables } from '../src/utils/template-vars.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'));
@@ -39,6 +45,13 @@ program
   .option('-f, --force', 'Overwrite target directory if it exists')
   .option('--no-git', 'Skip git initialization')
   .option('--no-github', 'Skip GitHub repo creation')
+  .option('--package-manager <pm>', 'Package manager (npm|yarn|pnpm)')
+  .option('--dry-run', 'Preview files without creating them')
+  .option('--license <type>', 'License type (MIT|Apache-2.0|GPL-3.0|ISC|BSD-3-Clause)')
+  .option('--author <name>', 'Author name')
+  .option('--profile <type>', 'Project profile (minimal|standard|full)')
+  .option('--docker', 'Include Docker configuration')
+  .option('--default-branch <branch>', 'Default git branch name (main|master)')
   .action(async (projectName, options) => {
     await createProject(projectName, options);
   });
@@ -61,6 +74,13 @@ program
   .option('-f, --force', 'Overwrite target directory if it exists')
   .option('--no-git', 'Skip git initialization')
   .option('--no-github', 'Skip GitHub repo creation')
+  .option('--package-manager <pm>', 'Package manager (npm|yarn|pnpm)')
+  .option('--dry-run', 'Preview files without creating them')
+  .option('--license <type>', 'License type (MIT|Apache-2.0|GPL-3.0|ISC|BSD-3-Clause)')
+  .option('--author <name>', 'Author name')
+  .option('--profile <type>', 'Project profile (minimal|standard|full)')
+  .option('--docker', 'Include Docker configuration')
+  .option('--default-branch <branch>', 'Default git branch name (main|master)')
   .action(async (projectName, options) => {
     if (!projectName && !process.argv.slice(2).length) {
       projectName = 'my-awesome-project';
@@ -157,19 +177,44 @@ async function createProject(projectName, options) {
 
   // Utilise le stack des options ou celui des réponses
   const finalStack = stack || answers.stack || 'javascript';
-  // Sanitize project name
+  // Sanitize project name (support scoped packages)
   let rawName = projectName || answers.projectName || 'my-awesome-project';
-  const sanitized = rawName
+  let scopedName = null;
+  let baseName = rawName;
+  
+  // Check for scoped package name
+  if (rawName.startsWith('@') && rawName.includes('/')) {
+    const parts = rawName.split('/');
+    scopedName = parts[0];
+    baseName = parts[1];
+  }
+  
+  const sanitized = baseName
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-_]/g, '');
-  if (sanitized !== rawName) {
-    console.log(chalk.yellow(`Nom de projet ajusté: '${rawName}' => '${sanitized}'`));
+  
+  let finalProjectName = sanitized || 'my-awesome-project';
+  if (scopedName) {
+    finalProjectName = `${scopedName}/${finalProjectName}`;
   }
-  const finalProjectName = sanitized || 'my-awesome-project';
+  
+  if (rawName !== finalProjectName) {
+    console.log(chalk.yellow(`Nom de projet ajusté: '${rawName}' => '${finalProjectName}'`));
+  }
   const finalDescription = options.description || answers.description || 'A new awesome project';
-  const projectPath = path.join(process.cwd(), finalProjectName);
+  const finalAuthor = options.author || answers.author || process.env.USER || 'Your Name';
+  const finalLicense = options.license || answers.license || 'MIT';
+  const finalProfile = options.profile || answers.profile || 'standard';
+  const packageManager = options.packageManager || answers.packageManager || await detectPackageManager();
+  const defaultBranch = options.defaultBranch || 'main';
+  const includeDocker = options.docker || answers.docker || false;
+  const dryRun = options.dryRun || false;
+  
+  // Use base name for directory (without scope)
+  const dirName = scopedName ? finalProjectName.split('/')[1] : finalProjectName;
+  const projectPath = path.join(process.cwd(), dirName);
 
   // Vérifie si le dossier existe déjà
   if (await fs.pathExists(projectPath)) {
@@ -192,6 +237,51 @@ async function createProject(projectName, options) {
     }
   }
 
+  // Import utilities
+  const { getProfileConfig, applyProfileToStack } = await import('../src/utils/profiles.js');
+  const { getTemplateVariables } = await import('../src/utils/template-vars.js');
+  const { getPrettierConfig, getESLintConfig, getBlackConfig, getIsortConfig, getRuboCopConfig } = await import('../src/templates/formatters.js');
+  
+  // Prepare template variables
+  const templateVars = getTemplateVariables({
+    projectName: finalProjectName,
+    description: finalDescription,
+    author: finalAuthor,
+    license: finalLicense,
+    packageManager,
+  });
+  
+  // Get profile configuration
+  const profileConfig = getProfileConfig(finalProfile);
+  
+  // Dry run mode
+  if (dryRun) {
+    console.log(chalk.cyan.bold('\n🔍 Mode Dry-Run - Aperçu des fichiers à créer:\n'));
+    console.log(chalk.white('📁 Structure du projet:'));
+    console.log(chalk.gray(`  ${dirName}/
+    ├── .ai/rules.md
+    ├── .cursorrules
+    ├── .claude_rules
+    ├── .editorconfig
+    ├── .gitignore
+    ├── README.md
+    └── src/`));
+    
+    if (profileConfig.includePreCommit) {
+      console.log(chalk.gray(`    ├── .pre-commit-config.yaml`));
+    }
+    if (profileConfig.includeGitHubActions) {
+      console.log(chalk.gray(`    └── .github/workflows/ci.yml`));
+    }
+    if (includeDocker) {
+      console.log(chalk.gray(`    ├── Dockerfile
+    └── docker-compose.yml`));
+    }
+    
+    console.log(chalk.cyan('\n✅ Dry-run terminé. Utilisez sans --dry-run pour créer le projet.'));
+    process.exit(0);
+  }
+  
   // Spinner pour la création
   const spinner = ora('Création du projet...').start();
 
@@ -211,10 +301,39 @@ async function createProject(projectName, options) {
 
     // Générer le README
     const readmeContent = generateReadme(finalProjectName, finalDescription, finalStack);
-    await fs.writeFile(path.join(projectPath, 'README.md'), readmeContent);
+    await fs.writeFile(path.join(projectPath, 'README.md'), replaceTemplateVariables(readmeContent, templateVars));
+    
+    // Generate .editorconfig
+    if (profileConfig.includeEditorconfig) {
+      const editorconfigContent = generateEditorconfig(finalStack);
+      await fs.writeFile(path.join(projectPath, '.editorconfig'), editorconfigContent);
+    }
 
     // Générer les fichiers spécifiques au stack
-    const stackConfig = getStackConfig(finalStack);
+    let stackConfig = getStackConfig(finalStack);
+    stackConfig = applyProfileToStack(stackConfig, finalProfile);
+    
+    // Add formatter configs for JS/TS stacks
+    if (['javascript', 'typescript', 'react', 'next'].includes(finalStack) && profileConfig.includeFormatting) {
+      stackConfig.files['.prettierrc'] = JSON.stringify(getPrettierConfig(finalStack), null, 2);
+      if (profileConfig.includeLinting) {
+        const isTS = ['typescript', 'react', 'next'].includes(finalStack);
+        stackConfig.files['.eslintrc.json'] = JSON.stringify(getESLintConfig(finalStack, isTS), null, 2);
+      }
+    }
+    
+    // Add Python formatter configs
+    if (['python', 'fastapi'].includes(finalStack) && profileConfig.includeFormatting) {
+      if (!stackConfig.files['pyproject.toml']) {
+        stackConfig.files['pyproject.toml'] = '';
+      }
+      stackConfig.files['pyproject.toml'] += '\n' + getBlackConfig() + '\n' + getIsortConfig();
+    }
+    
+    // Add Ruby formatter configs
+    if (['ruby', 'rails'].includes(finalStack) && profileConfig.includeLinting) {
+      stackConfig.files['.rubocop.yml'] = getRuboCopConfig();
+    }
     
     // Créer les fichiers de config du stack
     for (const [filename, content] of Object.entries(stackConfig.files)) {
@@ -224,9 +343,41 @@ async function createProject(projectName, options) {
       // Créer le répertoire si nécessaire
       await fs.ensureDir(fileDir);
       
-      // Remplacer PROJECT_NAME par le vrai nom
-      const finalContent = content.replace(/PROJECT_NAME/g, finalProjectName);
+      // Replace template variables
+      const finalContent = replaceTemplateVariables(content, templateVars);
       await fs.writeFile(filePath, finalContent);
+    }
+    
+    // Generate pre-commit config
+    if (profileConfig.includePreCommit) {
+      const preCommitConfig = generatePreCommitConfig(finalStack, packageManager);
+      if (preCommitConfig) {
+        const preCommitContent = replaceTemplateVariables(preCommitConfig, templateVars);
+        await fs.writeFile(path.join(projectPath, '.pre-commit-config.yaml'), preCommitContent);
+      }
+    }
+    
+    // Generate GitHub Actions
+    if (profileConfig.includeGitHubActions) {
+      const ghActions = generateGitHubActions(finalStack, packageManager);
+      if (ghActions) {
+        for (const [filename, content] of Object.entries(ghActions)) {
+          const filePath = path.join(projectPath, filename);
+          await fs.ensureDir(path.dirname(filePath));
+          await fs.writeFile(filePath, replaceTemplateVariables(content, templateVars));
+        }
+      }
+    }
+    
+    // Generate Docker files
+    if (includeDocker) {
+      const dockerFiles = generateDockerfiles(finalStack, packageManager);
+      if (dockerFiles) {
+        for (const [filename, content] of Object.entries(dockerFiles)) {
+          const filePath = path.join(projectPath, filename);
+          await fs.writeFile(filePath, replaceTemplateVariables(content, templateVars));
+        }
+      }
     }
 
     // .gitignore
@@ -238,7 +389,7 @@ async function createProject(projectName, options) {
     if (options.git !== false) {
       const gitSpinner = ora('Initialisation Git...').start();
       const git = simpleGit(projectPath);
-      await git.init();
+      await git.init(defaultBranch ? ['--initial-branch', defaultBranch] : []);
       await git.add('.');
       await git.commit('🚀 Initial commit - AI-optimized project');
       gitSpinner.succeed(chalk.green('Git initialisé!'));
@@ -252,20 +403,68 @@ async function createProject(projectName, options) {
     // Instructions finales
     console.log(chalk.cyan.bold('\n✨ Projet créé avec succès!\n'));
     console.log(chalk.white('📁 Dossier: ') + chalk.yellow(projectPath));
+    console.log(chalk.white('📦 Package Manager: ') + chalk.yellow(packageManager));
+    console.log(chalk.white('⚙️  Profil: ') + chalk.yellow(finalProfile));
     console.log(chalk.white('\n🚀 Pour commencer:\n'));
-    console.log(chalk.gray(`  cd ${finalProjectName}`));
+    console.log(chalk.gray(`  cd ${dirName}`));
     
-    // Commandes spécifiques au stack
-    if (stackConfig.commands) {
-      stackConfig.commands.forEach(cmd => {
-        console.log(chalk.gray(`  ${cmd}`));
-      });
+    // Package manager specific commands
+    const pmCommands = getPackageManagerCommands(packageManager);
+    
+    // Stack specific commands with proper package manager
+    if (['javascript', 'typescript', 'react', 'next'].includes(finalStack)) {
+      console.log(chalk.gray(`  ${pmCommands.install}`));
+      if (profileConfig.includeLinting) console.log(chalk.gray(`  ${pmCommands.run} lint`));
+      if (profileConfig.includeFormatting) console.log(chalk.gray(`  ${pmCommands.run} format`));
+      if (profileConfig.includeTests) console.log(chalk.gray(`  ${pmCommands.run} test`));
+      console.log(chalk.gray(`  ${pmCommands.run} dev`));
+    } else if (['python', 'fastapi'].includes(finalStack)) {
+      const isWindows = process.platform === 'win32';
+      console.log(chalk.gray('  python -m venv venv'));
+      if (isWindows) {
+        console.log(chalk.gray('  # Windows PowerShell:'));
+        console.log(chalk.gray('  .\\venv\\Scripts\\Activate.ps1'));
+        console.log(chalk.gray('  # Windows Command Prompt:'));
+        console.log(chalk.gray('  venv\\Scripts\\activate.bat'));
+      } else {
+        console.log(chalk.gray('  source venv/bin/activate'));
+      }
+      console.log(chalk.gray('  pip install -r requirements.txt'));
+      if (profileConfig.includeLinting) console.log(chalk.gray('  black . && isort . && flake8'));
+      if (profileConfig.includeTests) console.log(chalk.gray('  pytest'));
+      if (finalStack === 'fastapi') {
+        console.log(chalk.gray('  uvicorn main:app --reload'));
+      } else {
+        console.log(chalk.gray('  python src/main.py'));
+      }
+    } else if (['ruby', 'rails'].includes(finalStack)) {
+      console.log(chalk.gray('  bundle install'));
+      if (profileConfig.includeLinting) console.log(chalk.gray('  bundle exec rubocop'));
+      if (profileConfig.includeTests) console.log(chalk.gray('  bundle exec rspec'));
+      if (finalStack === 'rails') {
+        console.log(chalk.gray('  bundle exec rails db:create'));
+        console.log(chalk.gray('  bundle exec rails server'));
+      } else {
+        console.log(chalk.gray('  ruby src/main.rb'));
+      }
+    }
+    
+    if (includeDocker) {
+      console.log(chalk.cyan('\n🐳 Docker:'));
+      console.log(chalk.gray('  docker-compose up'));
     }
 
     console.log(chalk.cyan('\n💡 Les règles IA sont dans:'));
     console.log(chalk.gray('   - .ai/rules.md (dossier principal)'));
     console.log(chalk.gray('   - .cursorrules (pour Cursor)'));
     console.log(chalk.gray('   - .claude_rules (pour Claude)'));
+    
+    if (profileConfig.includePreCommit) {
+      console.log(chalk.cyan('\n🔧 Pre-commit hooks:'));
+      console.log(chalk.gray('  pip install pre-commit'));
+      console.log(chalk.gray('  pre-commit install'));
+    }
+    
     console.log(chalk.cyan('\n🤖 Compatible avec: Claude, Cursor, Copilot, ChatGPT\n'));
 
   } catch (error) {

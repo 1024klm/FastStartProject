@@ -114,6 +114,7 @@ if __name__ == "__main__":
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 
 # Database (uncomment as needed)
@@ -136,7 +137,8 @@ httpx>=0.24.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.4.0
-pre-commit>=3.3.0`,
+pre-commit>=3.3.0
+isort>=5.12.0`,
     'pyproject.toml': `[tool.black]
 line-length = 88
 target-version = ['py39', 'py310', 'py311']

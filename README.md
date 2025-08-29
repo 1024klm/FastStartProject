@@ -2,16 +2,6 @@
 
 Générateur de projets ultra-rapide optimisé pour les assistants IA (Claude, Cursor, Copilot).
 
-## Installation
-
-```bash
-# Global
-npm install -g faststartproject
-
-# Ou avec npx
-npx faststartproject@latest my-app
-```
-
 ## Utilisation
 
 ```bash

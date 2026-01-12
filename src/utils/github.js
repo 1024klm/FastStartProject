@@ -78,10 +78,6 @@ export async function createGitHubRepo(projectName, visibility = 'private', proj
       args.push('--description', `"${options.description}"`);
     }
     
-    if (options.topics && options.topics.length > 0) {
-      // Add topics after creation
-    }
-    
     if (options.push !== false) {
       args.push('--push');
     }
@@ -92,12 +88,6 @@ export async function createGitHubRepo(projectName, visibility = 'private', proj
       execSync(command, { cwd: projectPath, stdio: 'pipe' });
       spinner.succeed(chalk.green('GitHub repository created successfully!'));
       
-      // Add topics if provided
-      if (options.topics && options.topics.length > 0) {
-        const topicsCommand = `gh repo edit ${projectName} --add-topic "${options.topics.join(',')}"`;
-        execSync(topicsCommand, { cwd: projectPath, stdio: 'pipe' });
-        console.log(chalk.green('✓ Topics added: ') + chalk.gray(options.topics.join(', ')));
-      }
       
       // Enable features if requested
       if (options.enableIssues) {

@@ -372,7 +372,6 @@ async function createProject(projectName, options) {
       if (!nonInteractive && answers.github) {
         await createGitHubRepo(finalProjectName, answers.visibility, projectPath, {
           description: finalDescription,
-          topics: [finalStack, 'faststart'],
           enableIssues: true,
           protectMain: finalProfile === 'full'
         });

@@ -1,7 +1,7 @@
 {
   "name": "faststartproject",
   "version": "1.0.0",
-  "description": "Lightning fast project generator optimized for AI coding assistants",
+  "description": "Lightning fast project generator",
   "bin": {
     "faststart": "./bin/cli.js",
     "newproject": "./bin/cli.js"
@@ -9,10 +9,9 @@
   "type": "module",
   "main": "bin/cli.js",
   "scripts": {
-    "test": "node test/smoke.test.js",
-    "test:quick": "node bin/cli.js test-project --javascript --no-github --no-git --yes --force --profile minimal",
     "start": "node bin/cli.js start",
-    "dev": "node bin/cli.js"
+    "dev": "node bin/cli.js",
+    "create-lamdera": "./scripts/create-lamdera-app.sh"
   },
   "dependencies": {
     "commander": "^11.0.0",
@@ -24,10 +23,6 @@
   },
   "keywords": [
     "cli",
-    "ai",
-    "claude",
-    "cursor",
-    "copilot",
     "project-generator",
     "boilerplate",
     "starter",

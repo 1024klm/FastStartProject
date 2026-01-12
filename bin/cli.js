@@ -8,10 +8,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { simpleGit } from 'simple-git';
 import { fileURLToPath } from 'url';
-import { generateRules } from '../src/templates/rules.js';
-import { generateReadme } from '../src/templates/readme.js';
 import { generateEditorconfig } from '../src/templates/editorconfig.js';
-import { generatePreCommitConfig } from '../src/templates/precommit.js';
 import { generateGitHubActions } from '../src/templates/github-actions.js';
 import { generateDockerfiles } from '../src/templates/docker.js';
 import { getStackConfig } from '../src/stacks/index.js';
@@ -24,7 +21,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'
 
 program
   .name('newproject')
-  .description('⚡ Lightning fast AI-optimized project generator')
+  .description('⚡ Lightning fast project generator')
   .version(pkg.version || '1.0.0');
 
 program
@@ -89,7 +86,7 @@ program
   });
 
 async function createProject(projectName, options) {
-  console.log(chalk.cyan.bold('\n⚡ AI Project Generator\n'));
+  console.log(chalk.cyan.bold('\n⚡ FastStart Project Generator\n'));
 
   // Détermine le stack
   let stack = null;
@@ -259,17 +256,10 @@ async function createProject(projectName, options) {
     console.log(chalk.cyan.bold('\n🔍 Mode Dry-Run - Aperçu des fichiers à créer:\n'));
     console.log(chalk.white('📁 Structure du projet:'));
     console.log(chalk.gray(`  ${dirName}/
-    ├── .ai/rules.md
-    ├── .cursorrules
-    ├── .claude_rules
     ├── .editorconfig
     ├── .gitignore
-    ├── README.md
     └── src/`));
-    
-    if (profileConfig.includePreCommit) {
-      console.log(chalk.gray(`    ├── .pre-commit-config.yaml`));
-    }
+
     if (profileConfig.includeGitHubActions) {
       console.log(chalk.gray(`    └── .github/workflows/ci.yml`));
     }
@@ -277,7 +267,7 @@ async function createProject(projectName, options) {
       console.log(chalk.gray(`    ├── Dockerfile
     └── docker-compose.yml`));
     }
-    
+
     console.log(chalk.cyan('\n✅ Dry-run terminé. Utilisez sans --dry-run pour créer le projet.'));
     process.exit(0);
   }
@@ -290,19 +280,8 @@ async function createProject(projectName, options) {
     await fs.ensureDir(projectPath);
 
     // Créer la structure de base
-    await fs.ensureDir(path.join(projectPath, '.ai'));
     await fs.ensureDir(path.join(projectPath, 'src'));
 
-    // Générer les règles IA
-    const rulesContent = generateRules(finalDescription, finalStack);
-    await fs.writeFile(path.join(projectPath, '.ai', 'rules.md'), rulesContent);
-    await fs.writeFile(path.join(projectPath, '.cursorrules'), rulesContent);
-    await fs.writeFile(path.join(projectPath, '.claude_rules'), rulesContent);
-
-    // Générer le README
-    const readmeContent = generateReadme(finalProjectName, finalDescription, finalStack);
-    await fs.writeFile(path.join(projectPath, 'README.md'), replaceTemplateVariables(readmeContent, templateVars));
-    
     // Generate .editorconfig
     if (profileConfig.includeEditorconfig) {
       const editorconfigContent = generateEditorconfig(finalStack);
@@ -352,15 +331,6 @@ async function createProject(projectName, options) {
       await fs.writeFile(filePath, finalContent);
     }
     
-    // Generate pre-commit config
-    if (profileConfig.includePreCommit) {
-      const preCommitConfig = generatePreCommitConfig(finalStack, packageManager);
-      if (preCommitConfig) {
-        const preCommitContent = replaceTemplateVariables(preCommitConfig, templateVars);
-        await fs.writeFile(path.join(projectPath, '.pre-commit-config.yaml'), preCommitContent);
-      }
-    }
-    
     // Generate GitHub Actions
     if (profileConfig.includeGitHubActions) {
       const ghActions = generateGitHubActions(finalStack, packageManager);
@@ -395,14 +365,14 @@ async function createProject(projectName, options) {
       const git = simpleGit(projectPath);
       await git.init(defaultBranch ? ['--initial-branch', defaultBranch] : []);
       await git.add('.');
-      await git.commit('🚀 Initial commit - AI-optimized project');
+      await git.commit('🚀 Initial commit');
       gitSpinner.succeed(chalk.green('Git initialisé!'));
 
       // GitHub repo (ne pas déclencher auto en mode non-interactif)
       if (!nonInteractive && answers.github) {
         await createGitHubRepo(finalProjectName, answers.visibility, projectPath, {
           description: finalDescription,
-          topics: [finalStack, 'ai-optimized', 'faststart'],
+          topics: [finalStack, 'faststart'],
           enableIssues: true,
           protectMain: finalProfile === 'full'
         });
@@ -463,18 +433,7 @@ async function createProject(projectName, options) {
       console.log(chalk.gray('  docker-compose up'));
     }
 
-    console.log(chalk.cyan('\n💡 Les règles IA sont dans:'));
-    console.log(chalk.gray('   - .ai/rules.md (dossier principal)'));
-    console.log(chalk.gray('   - .cursorrules (pour Cursor)'));
-    console.log(chalk.gray('   - .claude_rules (pour Claude)'));
-    
-    if (profileConfig.includePreCommit) {
-      console.log(chalk.cyan('\n🔧 Pre-commit hooks:'));
-      console.log(chalk.gray('  pip install pre-commit'));
-      console.log(chalk.gray('  pre-commit install'));
-    }
-    
-    console.log(chalk.cyan('\n🤖 Compatible avec: Claude, Cursor, Copilot, ChatGPT\n'));
+    console.log('');
 
   } catch (error) {
     spinner.fail(chalk.red('Erreur lors de la création'));

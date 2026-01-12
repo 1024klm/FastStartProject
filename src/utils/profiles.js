@@ -4,7 +4,6 @@ export function getProfileConfig(profile) {
       includeTests: false,
       includeLinting: false,
       includeFormatting: false,
-      includePreCommit: false,
       includeGitHubActions: false,
       includeDocker: false,
       includeEditorconfig: false,
@@ -13,7 +12,6 @@ export function getProfileConfig(profile) {
       includeTests: true,
       includeLinting: true,
       includeFormatting: true,
-      includePreCommit: true,
       includeGitHubActions: false,
       includeDocker: false,
       includeEditorconfig: true,
@@ -22,13 +20,12 @@ export function getProfileConfig(profile) {
       includeTests: true,
       includeLinting: true,
       includeFormatting: true,
-      includePreCommit: true,
       includeGitHubActions: true,
       includeDocker: true,
       includeEditorconfig: true,
     },
   };
-  
+
   return profiles[profile] || profiles.standard;
 }
 
